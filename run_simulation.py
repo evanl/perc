@@ -2,6 +2,8 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import perc_objects as po
+from time import time, clock
+import sys
 #import read_eclipse as re
 
 
@@ -9,10 +11,10 @@ def check_input_args(arguments):
     try:
         grid_size = int(arguments[0])
     except IndexError:
-        fail('Expected 3 arguments, got %d' %\
+        po.fail('Expected 1 arguments, got %d' %\
                 len(arguments))
     except ValueError:
-        fail('expected int arguments, got %s' % \
+        po.fail('expected int arguments, got %s' % \
                 str(arguments))
     return 0
 
@@ -20,7 +22,7 @@ def check_input_args(arguments):
     #if options == 'awesome':
         #print 'awesome'
     #else:
-        #fail('for shame')
+        #po.fail('for shame')
     # sketch ideas of interface
     #e_cells, nx, ny, nz = re.read_eclipse()
     #perc_sim = PercSim(nx, ny, nz, e_cells = e_cells)
@@ -34,12 +36,22 @@ def check_input_args(arguments):
 
 
 if __name__ == '__main__':
+    # profiling command
+    # '$ python -m cProfile -s time __main__.py N >prof.out
     # get parameters from command line
-    #arguments = sys.argv[1:]
-    #check_input_args(arguments)
-    nx = 9
-    ny = 9
-    nz = 1
-    perc = po.Perc(nx, ny, nz)
+    arguments = sys.argv[1:]
+    check_input_args(arguments)
+    nx = int(arguments[0])
+    ny = int(arguments[0])
+    nz = int(arguments[0])
+    #nz = 1
+    t0 = clock()
+    r_max = 10000
+    perc = po.Perc(nx, ny, nz, r_max = r_max)
     perc.run_simulation()
-    perc.plot_2d()
+    t1 = clock()
+    print "percolation time = ", t1 - t0
+    if nz == 1:
+        perc.plot_2d()
+    else:
+        perc.plot_3d()
