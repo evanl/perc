@@ -4,6 +4,8 @@
 *.out
 *.txt
 *.csv
+*.png
+*.tex
 M9X1*
 read_eclipse.py
 eclipse_cells.py

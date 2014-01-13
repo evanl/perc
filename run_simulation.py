@@ -45,16 +45,27 @@ if __name__ == '__main__':
     ny = int(arguments[0])
     nz = int(arguments[0])
     #nz = 1
-    r_max = 10000
+    r_max = 1000000
     perc = po.Perc(nx, ny, nz, r_max = r_max)
-    # perc.make_uniform_grid()
-    # perc.make_sleipner_csv()
+    mass_inflow = 0.1418
+    density = 700.
+    sim_time = 11 * 365.25 
+    perc.add_injection(mass_inflow, sim_time, density)
+    injection = True
+    #perc.make_uniform_grid()
+    #perc.make_sleipner_csv()
     vol_dict, xyz_dict, poroperm_dict = perc.read_sleipner_csv()
     perc.make_sleipner_grid(vol_dict, xyz_dict, poroperm_dict)
     t0 = clock()
-    perc.run_simulation()
+    perc.run_simulation(injection = injection)
     t1 = clock()
     print "percolation time = ", t1 - t0
+    n, tseg = perc.get_time_index_gravseg()
+    print "n, gravseg_days"
+    print n, tseg
+    yr_indices = perc.get_plan_year_indices()
+    print yr_indices
+    perc.plot_sleipner_plume()
     if nz == 1:
         perc.plot_2d()
     else:

@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 from mpl_toolkits.mplot3d import Axes3D
 import random
 import sys
@@ -30,13 +31,68 @@ class Perc(object):
         self.x = {}
         self.y = {}
         self.z = {}
+        self.thres_z = {}
         self.corners = {}
         self.perm = {}
         self.poro = {}
         self.volume = {}
         self.grid_values = {}
         self.fill_steps = []
+        self.fill_times = []
         self.candidates = [] #keep sorted
+
+    def add_injection(self, megatons_year, end_time_days,\
+            density):
+        self.injection = self.Injection(megatons_year, end_time_days, \
+                density)
+
+    class Injection(object):
+        def __init__(self, megatons_year, end_time_days, density):
+            self.rho = density
+            self.massflow = megatons_year
+                                    #conversion factor
+            self.q = megatons_year * 31.71 / self.rho # -> m^3/s
+            self.t_elapsed = 1998 * 365.25 # days
+            self.t_end = end_time_days + self.t_elapsed
+            self.injected_mass = 0.
+            self.injected_volume = 0.
+            self.max_mass = self.t_end * self.massflow * 31.71 
+            self.max_volume = self.max_mass / self.rho
+
+        def add_time(self, t_add):
+            self.t_elapsed += t_add
+            return 0
+
+        def add_mass(self, vol_add):
+            self.injected_mass += self.rho * vol_add
+            self.injected_volume += vol_add
+            time_taken = vol_add / (self.q * 24 * 3600) # add time in days
+            self.add_time(time_taken)
+            return 0
+
+        def get_elapsed_time(self):
+            return self.t_elapsed
+
+        def get_injected_mass(self):
+            return self.injected_mass
+
+        def get_injected_volume(self):
+            return self.injected_volume
+
+        def get_density(self):
+            return self.rho
+
+        def get_mass_inflow(self):
+            return self.massflow
+
+        def get_end_time(self):
+            return self.t_end
+
+        def end_reached(self):
+            if self.t_elapsed > self.t_end:
+                return True
+            else:
+                return False
 
     class Corner(object):
         def __init__(self, x, y, z):
@@ -69,7 +125,7 @@ class Perc(object):
         else:
             self.grid_values[key] = val
 
-    def mark_filled(self, key):
+    def mark_filled(self, key, time = '1'):
         """ marks grid values as filled if they are 
         within the bounds of the grid size
         """
@@ -86,12 +142,13 @@ class Perc(object):
                     'k coordinate out of range (%d vs %d)' % \
                     (key[2], self.nz)
         self.fill_steps.append(key)
+        self.fill_times.append(time)
 
     def find_new_candidates(self):
         """ grabs neighbor cell values, inserts them into sorted list
         """
-        k = self.fill_steps[-1]
-        new_can = self.get_neighbor_candidates(k)
+        key = self.fill_steps[-1]
+        new_can = self.get_neighbor_candidates(key)
         for can in new_can:
             bisect.insort_left(self.candidates, (self.grid_values[can], can))
         return self.candidates
@@ -121,18 +178,37 @@ class Perc(object):
         return keys
 
     def end_criterion(self, end_type = 'boundary'):
-        if self.choice[0] in (0, self.nx-1) \
-                or self.choice[1] in (0, self.ny-1):
-            return True
-        elif self.nz != 1 and self.choice[2] in (0, self.nz-1):
-            return True
-        else:
-            return False
+        if end_type == 'boundary':
+            if self.choice[0] in (0, self.nx-1) \
+                    or self.choice[1] in (0, self.ny-1):
+                return True
+            elif self.nz != 1 and self.choice[2] in (0, self.nz-1):
+                return True
+            else:
+                return False
+        elif end_type == 'injection':
+            #if self.injection.end_reached():
+                #return True
+            #else:
+                #return False
+            end_time = self.injection.get_end_time()
+            elapsed = self.injection.get_elapsed_time()
+            #print '{:.3e}'.format(elapsed), '{:.3e}'.format(end_time)
+            if elapsed > end_time:
+                return True
+            elif self.end_criterion(end_type = 'boundary'):
+                return True
+            else:
+                return False
 
-    def run_simulation(self):
+    def run_simulation(self, injection = False):
         """ fills grid. If no initial value is specified, picks
         i, j, k == nx/2, ny/2, nz/2
         """
+        if injection == True:
+            end_type = 'injection'
+        else:
+            end_type = 'boundary'
         print "PERCOLATING........"
         step_count = 0
         while True:
@@ -140,13 +216,25 @@ class Perc(object):
             self.candidates = self.find_new_candidates()
             assert self.candidates, 'no fillable cells found'
             self.choice = self.percolate()
-            self.mark_filled(self.choice)
-            if self.end_criterion():
+            time = step_count
+            if injection == True:
+                volume_filled = self.poro[self.choice] * \
+                        self.volume[self.choice]
+                self.injection.add_mass(volume_filled)
+                time = self.injection.get_elapsed_time()
+
+            self.mark_filled(self.choice, time = time)
+            if self.end_criterion(end_type = end_type):
                 break
         return 0
 
     def percolate(self):
         choice = self.candidates[0][1]
+        print choice, '{:.3e}'.format(self.grid_values[choice]),\
+                " runner up -> ", self.candidates[1][1], \
+                '{:.3e}'.format(self.grid_values[self.candidates[1][1]]),\
+                " end", '{:.3e}'.format(self.grid_values[self.candidates[-1][1]])
+                
         self.candidates.remove(self.candidates[0])
         return choice
 
@@ -173,6 +261,7 @@ class Perc(object):
         self.nx = 65
         self.ny = 119
         self.nz = 43
+        base_elev = xyz_dict[(32, 77, 34)][2]
         for i in range(self.nx):
             for j in range(self.ny):
                 for k in range(self.nz):
@@ -186,18 +275,211 @@ class Perc(object):
                     self.x[key] = x
                     self.y[key] = y
                     self.z[key] = z
+                    self.thres_z[key] = base_elev - z
+                    if j <=49:
+                        boost = 0.0
+                        self.z[key] += boost
+                        self.thres_z[key] += boost
                     self.volume[key] = vol
                     self.poro[key] = poro
                     self.perm[key] = perm
-                    #TODO
-                    # USE REAL THRESHOLD INSTEAD OF RANDOM
-                    self.set_grid_value(key)
+                    #if perm > 0.1:
+                        #self.perm[key] = 2000.
+                    val = self.perc_threshold(key) + 1 * pow(10,5.)
+                    #if i == 32 and j == 77:
+                        #print '{:d}, {:.3e}, {:.3e}'.format(k, perm, val)
+                    self.set_grid_value(key, val = val)
         if len(self.fill_steps) == 0:
-            init_key = (self.nx/2, self.ny/2, self.nz/2)
-            self.mark_filled(init_key)
+            init_key = (32, 77, 34)
+            self.mark_filled(init_key, time = 1998. * 365.25 )
         print "grid with: (nx, ny, nz) = ", \
                 (self.nx, self.ny, self.nz), " made in "
         print clock() - t0, " seconds"
+        return 0
+
+    def perc_threshold(self, key):
+        # TODO
+        # ioannidis et al 1996. 
+        # this is total bunk, by the way.
+        c = 0.186
+        c = pow(10.,8.)
+        sigma = 0.045
+        #c = 1.
+        #sigma = 1.
+        pcd = c * sigma * \
+                pow(self.perm[key] / self.poro[key], -1/2.)
+        rho_b = 1019.
+        g = 9.81
+        delta_rho = rho_b - self.injection.get_density() 
+        pgrav = delta_rho * g * (self.thres_z[key])
+        if key[0] == 32 and key[1] == 77:
+            a = 1
+            print "k, pcd, pgrav", "perm"
+            print '{:d}, {:3e}, {:3e}, {:3e}'.format(key[2], pcd, \
+                    pgrav, pcd + pgrav)
+        return pcd + pgrav
+
+    def get_time_index_gravseg(self):
+        time_days = 0.
+        n = 0
+        time_indices = []
+        for i in range(1, len(self.fill_steps)):
+            key = self.fill_steps[i]
+            key0 = self.fill_steps[i-1]
+            if key[2] == 2 and key0[2] != 2:
+                time_indices.append(i)
+        n = time_indices[0]
+        time_days = self.fill_times[n] 
+        return n, time_days
+
+    def get_plan_year_indices(self):
+        years = [1999, 2001, 2002, 2004, 2006, 2008]
+        yr_indices = []
+        for year in years:
+            yr_days = (year) * 365.25 
+            for n in range(0, len(self.fill_times)):
+                yr_ind = 0
+                if n > 0 and \
+                    self.fill_times[n] > yr_days and \
+                    self.fill_times[n-1] < yr_days:
+                    yr_ind = n
+                    yr_indices.append(yr_ind)
+        return yr_indices
+
+    def plot_sleipner_plume(self):
+        years = [1999, 2001, 2002, 2004, 2006, 2008]
+        yr_indices = self.get_plan_year_indices()
+        size = 14
+        font = {'size' : size}
+        matplotlib.rc('font', **font)
+        fig = plt.figure(figsize=(20.0, 5))
+        pos = 160
+        for i in range(len(yr_indices)):
+            pos +=1
+            ax = fig.add_subplot(pos)
+            xf = []
+            yf = []
+            kf = []
+            for n in range(yr_indices[i]):
+                key = self.fill_steps[n]
+                xf.append(self.x[key])
+                yf.append(self.y[key])
+                if 50 == key[1]:
+                    key1 = (key[0], key[1]-1, key[2])
+                    print key, self.y[key], self.z[key], self.z[key1]
+                kf.append(key[2])
+            xp = np.asarray(xf)
+            yp = np.asarray(yf)
+            sc = ax.scatter(xp, yp, s=20, c=kf)
+            ax.axis([0,3000,0,6000])
+            ax.set_title(str(years[i]))
+            ax.xaxis.set_ticks(np.arange(0,3000,1500))
+            if i != 0:
+                ax.set_yticklabels([])
+            elif i == 5:
+                cb_axes = self.fig.add_axes([0.85, 0.15, 0.05, 0.7])
+                fig.colorbar(sc, cax = cb_axes)
+            
+
+        plt.savefig('sleipner_perc.png')
+        plt.clf()
+
+        return 0
+
+    def make_scatter_plan_t0_tn(self, t0, tn):
+        n = tn-t0
+        x = np.zeros(n)
+        y = np.zeros(n)
+        for n in range(t0, tn):
+            key = self.fill_steps[n]
+            x[n] = self.x[key]
+            y[n] = self.y[key]
+        return x, y
+       
+    def plot_2d(self, uniform_grid = True):
+        print "PLOTTING..........."
+        f = plt.figure()
+        ax = f.add_subplot(111)
+
+        # make base grid of cells
+        if uniform_grid == True:
+            pts = []
+            xs = []
+            ys = []
+            for i in [0, self.nx-1]:
+                for j in [0, self.ny-1]:
+                    key = (i, j, 0)
+                    xs.append(self.x[key])
+                    ys.append(self.y[key])
+            xp = np.asarray(xs)
+            yp = np.asarray(ys)
+            ax.scatter(xp, yp, s=30, c='w', marker='s')
+
+        # go through steps and figure out times
+        xf = []
+        yf = []
+        tf = []
+        tmin = self.fill_times[0]
+        tmax = self.fill_times[-1]
+        for i in range(0, len(self.fill_steps)):
+            key = self.fill_steps[i]
+            xf.append(self.x[key])
+            yf.append(self.y[key])
+            tf.append(self.fill_times[i])
+
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        xfp = np.asarray(xf)
+        yfp = np.asarray(yf)
+        cm = plt.get_cmap('bone_r')
+        sc = ax.scatter(xfp, yfp, c = tf, vmin=tmin, vmax=tmax, s = 300, cmap=cm)
+        plt.colorbar(sc)
+        plt.savefig('sleipner_3d.png')
+        #plt.show()
+
+    def plot_3d(self, uniform_grid = True):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection = '3d')
+
+        if uniform_grid == True:
+            pts = []
+            xs = []
+            ys = []
+            zs = []
+            for i in [0, self.nx-1]:
+                for j in [0, self.ny-1]:
+                    for k in [0, self.nz-1]:
+                        key = (i, j, k)
+                        xs.append(self.x[key])
+                        ys.append(self.y[key])
+                        zs.append(self.z[key])
+            xp = np.asarray(xs)
+            yp = np.asarray(ys)
+            zp = np.asarray(zs)
+            ax.scatter(xp, yp, zp, s=30, c='w', marker='s')
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        xf = [] 
+        yf = []
+        zf = []
+        tf = []
+        tmin = self.fill_times[0]
+        tmax = self.fill_times[-1]
+        for i in range(0, len(self.fill_steps)):
+            key = self.fill_steps[i]
+            xf.append(self.x[key])
+            yf.append(self.y[key])
+            zf.append(self.z[key])
+            tf.append(self.fill_times[i])
+        xfp = np.asarray(xf)
+        yfp = np.asarray(yf)
+        zfp = np.asarray(zf)
+        cm = plt.get_cmap('bone_r')
+        sc = ax.scatter(xfp, yfp, zfp, \
+                c = tf, vmin=tmin, vmax=tmax, s = 300, cmap=cm)
+        plt.colorbar(sc)
+        #plt.show()
         return 0
 
     def make_sleipner_csv(self):
@@ -465,90 +747,6 @@ class Perc(object):
         b1 = y4 - y2
         b2 = y3 - y1
         return 0.5 * h * (b1 + b2)
-       
-    def plot_2d(self, uniform_grid = True):
-        print "PLOTTING..........."
-        f = plt.figure()
-        ax = f.add_subplot(111)
-
-        # make base grid of cells
-        if uniform_grid == True:
-            pts = []
-            xs = []
-            ys = []
-            for i in [0, self.nx-1]:
-                for j in [0, self.ny-1]:
-                    key = (i, j, 0)
-                    xs.append(self.x[key])
-                    ys.append(self.y[key])
-            xp = np.asarray(xs)
-            yp = np.asarray(ys)
-            ax.scatter(xp, yp, s=30, c='w', marker='s')
-
-        # go through steps and figure out times
-        xf = []
-        yf = []
-        tf = []
-        tmin = 0
-        tmax = len(self.fill_steps)
-        for i in range(tmin, tmax):
-            key = self.fill_steps[i]
-            xf.append(self.x[key])
-            yf.append(self.y[key])
-            tf.append(i)
-
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        xfp = np.asarray(xf)
-        yfp = np.asarray(yf)
-        cm = plt.get_cmap('bone_r')
-        sc = ax.scatter(xfp, yfp, c = tf, vmin=tmin, vmax=tmax, s = 300, cmap=cm)
-        plt.colorbar(sc)
-        plt.show()
-
-    def plot_3d(self, uniform_grid = True):
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection = '3d')
-
-        if uniform_grid == True:
-            pts = []
-            xs = []
-            ys = []
-            zs = []
-            for i in [0, self.nx-1]:
-                for j in [0, self.ny-1]:
-                    for k in [0, self.nz-1]:
-                        key = (i, j, k)
-                        xs.append(self.x[key])
-                        ys.append(self.y[key])
-                        zs.append(self.z[key])
-            xp = np.asarray(xs)
-            yp = np.asarray(ys)
-            zp = np.asarray(zs)
-            ax.scatter(xp, yp, zp, s=30, c='w', marker='s')
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-        xf = [] 
-        yf = []
-        zf = []
-        tf = []
-        tmin = 0
-        tmax = len(self.fill_steps)
-        for i in range(tmin, tmax):
-            key = self.fill_steps[i]
-            xf.append(self.x[key])
-            yf.append(self.y[key])
-            zf.append(self.z[key])
-            tf.append(i)
-        xfp = np.asarray(xf)
-        yfp = np.asarray(yf)
-        zfp = np.asarray(zf)
-        cm = plt.get_cmap('bone_r')
-        sc = ax.scatter(xfp, yfp, zfp, \
-                c = tf, vmin=tmin, vmax=tmax, s = 300, cmap=cm)
-        plt.colorbar(sc)
-        plt.show()
 
 def fail(msg):
     '''print error and quit'''
