@@ -49,7 +49,20 @@ if __name__ == '__main__':
     perc = po.Perc(nx, ny, nz, r_max = r_max)
     mass_inflow = 0.1418
     density = 700.
-    sim_time = 11 * 365.25 
+    sim_years = 1001
+    # TODO Run 501 years!
+    print "sim_years: " + str(sim_years)
+    if sim_years == 11:
+        years = [2001, 2002, 2004, 2006, 2008]
+    elif sim_years == 51:
+        years = [2000, 2010, 2020, 2030, 2040]
+    elif sim_years == 151:
+        years = [2000, 2030, 2060, 2090, 2120]
+    elif sim_years == 501:
+        years = [2000, 2100, 2200, 2300, 2400]
+    elif sim_years == 1001:
+        years = [2000, 2200, 2400, 2600, 2800]
+    sim_time = sim_years * 365.25 
     perc.add_injection(mass_inflow, sim_time, density)
     injection = True
     #perc.make_uniform_grid()
@@ -63,9 +76,13 @@ if __name__ == '__main__':
     n, tseg = perc.get_time_index_gravseg()
     print "n, gravseg_days"
     print n, tseg
-    yr_indices = perc.get_plan_year_indices()
+    yr_indices = perc.get_plan_year_indices(years)
     print yr_indices
-    perc.plot_sleipner_plume()
+    print "mass balance?"
+    print perc.inj.get_injected_mass() - \
+            perc.inj.get_max_mass()
+    perc.plot_sleipner_plume(years)
+    #perc.contour_topo()
     if nz == 1:
         perc.plot_2d()
     else:

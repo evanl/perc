@@ -6,6 +6,14 @@
 *.csv
 *.png
 *.tex
+*.dvi
+*.aux
+*.log
+*.pdf
+*.nav
+*.snm
+*.toc
+*.bib
 M9X1*
 read_eclipse.py
 eclipse_cells.py

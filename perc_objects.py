@@ -40,11 +40,17 @@ class Perc(object):
         self.fill_steps = []
         self.fill_times = []
         self.candidates = [] #keep sorted
+        self.sbres = 0.2
+        self.scmax = 1 - self.sbres
 
     def add_injection(self, megatons_year, end_time_days,\
             density):
-        self.injection = self.Injection(megatons_year, end_time_days, \
+        self.inj = self.Injection(megatons_year, end_time_days, \
                 density)
+
+    def add_volume(self, choice):
+        vol = self.poro[choice] * self.scmax * self.volume[choice]
+        return vol
 
     class Injection(object):
         def __init__(self, megatons_year, end_time_days, density):
@@ -56,13 +62,13 @@ class Perc(object):
             self.t_end = end_time_days + self.t_elapsed
             self.injected_mass = 0.
             self.injected_volume = 0.
-            self.max_mass = self.t_end * self.massflow * 31.71 
+            self.max_mass = end_time_days * self.massflow * 31.71 * 24 * 3600.
             self.max_volume = self.max_mass / self.rho
 
         def add_time(self, t_add):
             self.t_elapsed += t_add
             return 0
-
+        
         def add_mass(self, vol_add):
             self.injected_mass += self.rho * vol_add
             self.injected_volume += vol_add
@@ -72,6 +78,9 @@ class Perc(object):
 
         def get_elapsed_time(self):
             return self.t_elapsed
+        
+        def get_max_mass(self):
+            return self.max_mass
 
         def get_injected_mass(self):
             return self.injected_mass
@@ -181,6 +190,7 @@ class Perc(object):
         if end_type == 'boundary':
             if self.choice[0] in (0, self.nx-1) \
                     or self.choice[1] in (0, self.ny-1):
+                print "x-y Boundary hit " 
                 return True
             elif self.nz != 1 and self.choice[2] in (0, self.nz-1):
                 return True
@@ -191,10 +201,13 @@ class Perc(object):
                 #return True
             #else:
                 #return False
-            end_time = self.injection.get_end_time()
-            elapsed = self.injection.get_elapsed_time()
+            end_time = self.inj.get_end_time()
+            elapsed = self.inj.get_elapsed_time()
             #print '{:.3e}'.format(elapsed), '{:.3e}'.format(end_time)
             if elapsed > end_time:
+                print "end criterion"
+                print "time elapsed: " + str(elapsed)
+                print " end time:    " + str(end_time)
                 return True
             elif self.end_criterion(end_type = 'boundary'):
                 return True
@@ -218,22 +231,27 @@ class Perc(object):
             self.choice = self.percolate()
             time = step_count
             if injection == True:
-                volume_filled = self.poro[self.choice] * \
-                        self.volume[self.choice]
-                self.injection.add_mass(volume_filled)
-                time = self.injection.get_elapsed_time()
+                volume_filled = self.add_volume(self.choice)
+                self.inj.add_mass(volume_filled)
+                time = self.inj.get_elapsed_time()
 
             self.mark_filled(self.choice, time = time)
             if self.end_criterion(end_type = end_type):
+                print "Number of Cells filled: " + \
+                        str(len(self.fill_steps))
+                print "mass in system        : " + \
+                        str(self.inj.get_injected_mass())
+                print "maximum mass          : " + \
+                        str(self.inj.get_max_mass())
                 break
         return 0
 
     def percolate(self):
         choice = self.candidates[0][1]
-        print choice, '{:.3e}'.format(self.grid_values[choice]),\
-                " runner up -> ", self.candidates[1][1], \
-                '{:.3e}'.format(self.grid_values[self.candidates[1][1]]),\
-                " end", '{:.3e}'.format(self.grid_values[self.candidates[-1][1]])
+        #print choice, '{:.3e}'.format(self.grid_values[choice]),\
+                #" runner up -> ", self.candidates[1][1], \
+                #'{:.3e}'.format(self.grid_values[self.candidates[1][1]]),\
+                #" end", '{:.3e}'.format(self.grid_values[self.candidates[-1][1]])
                 
         self.candidates.remove(self.candidates[0])
         return choice
@@ -297,6 +315,37 @@ class Perc(object):
         print clock() - t0, " seconds"
         return 0
 
+    def contour_topo(self):
+        fig = plt.figure(figsize = (9., 12.))
+        ax = fig.add_subplot(111)
+        x = []
+        y = []
+        elev = []
+        for i in range(65):
+            b2 = []
+            b3 = []
+            blank = []
+            #if i >= 35 and i < 50:
+            for j in range(119):
+                        #if j >= 45 and j < 75:
+                b2.append(self.x[(i, j, 2)])
+                b3.append(self.y[(i, j, 2)])
+                blank.append(self.z[(i, j, 2)])
+            elev.append(blank)
+            x.append(b2)
+            y.append(b3)
+        xp = np.asarray(x)
+        yp = np.asarray(y)
+        elp = np.asarray(elev)
+        N = 21
+        c = ax.contourf(xp, yp, elp, N)
+        cb = plt.colorbar(c, format='%.2f')
+        cb.set_ticks(np.linspace(np.amin(elp), np.amax(elp), N))
+        cb.set_label('elev [m]')
+        ax.set_xlabel('x [m]')
+        ax.set_ylabel('y [m]')
+        #plt.savefig('topo.png')
+
     def perc_threshold(self, key):
         # TODO
         # ioannidis et al 1996. 
@@ -310,13 +359,13 @@ class Perc(object):
                 pow(self.perm[key] / self.poro[key], -1/2.)
         rho_b = 1019.
         g = 9.81
-        delta_rho = rho_b - self.injection.get_density() 
+        delta_rho = rho_b - self.inj.get_density() 
         pgrav = delta_rho * g * (self.thres_z[key])
         if key[0] == 32 and key[1] == 77:
             a = 1
-            print "k, pcd, pgrav", "perm"
-            print '{:d}, {:3e}, {:3e}, {:3e}'.format(key[2], pcd, \
-                    pgrav, pcd + pgrav)
+            #print "k, pcd, pgrav", "perm"
+            #print '{:d}, {:3e}, {:3e}, {:3e}'.format(key[2], pcd, \
+                    #pgrav, pcd + pgrav)
         return pcd + pgrav
 
     def get_time_index_gravseg(self):
@@ -332,8 +381,7 @@ class Perc(object):
         time_days = self.fill_times[n] 
         return n, time_days
 
-    def get_plan_year_indices(self):
-        years = [1999, 2001, 2002, 2004, 2006, 2008]
+    def get_plan_year_indices(self, years):
         yr_indices = []
         for year in years:
             yr_days = (year) * 365.25 
@@ -346,14 +394,13 @@ class Perc(object):
                     yr_indices.append(yr_ind)
         return yr_indices
 
-    def plot_sleipner_plume(self):
-        years = [1999, 2001, 2002, 2004, 2006, 2008]
-        yr_indices = self.get_plan_year_indices()
+    def plot_sleipner_plume(self, years):
+        yr_indices = self.get_plan_year_indices(years)
         size = 14
         font = {'size' : size}
         matplotlib.rc('font', **font)
-        fig = plt.figure(figsize=(20.0, 5))
-        pos = 160
+        fig = plt.figure(figsize=(16.0, 5))
+        pos = 150
         for i in range(len(yr_indices)):
             pos +=1
             ax = fig.add_subplot(pos)
@@ -362,23 +409,25 @@ class Perc(object):
             kf = []
             for n in range(yr_indices[i]):
                 key = self.fill_steps[n]
+                #if key[0] >= 35 and key[0] < 50:
+                    #if key[1] >= 45 and key[1] < 75: 
                 xf.append(self.x[key])
                 yf.append(self.y[key])
+                kf.append(key[2])
                 if 50 == key[1]:
                     key1 = (key[0], key[1]-1, key[2])
-                    print key, self.y[key], self.z[key], self.z[key1]
-                kf.append(key[2])
+                    #print key, self.y[key], self.z[key], self.z[key1]
             xp = np.asarray(xf)
             yp = np.asarray(yf)
             sc = ax.scatter(xp, yp, s=20, c=kf)
-            ax.axis([0,3000,0,6000])
             ax.set_title(str(years[i]))
-            ax.xaxis.set_ticks(np.arange(0,3000,1500))
+            ax.axis([0, 3000, 0, 6000])
+            ax.xaxis.set_ticks(np.arange(0, 3000, 1500))
             if i != 0:
                 ax.set_yticklabels([])
-            elif i == 5:
-                cb_axes = self.fig.add_axes([0.85, 0.15, 0.05, 0.7])
-                fig.colorbar(sc, cax = cb_axes)
+            #elif i == 5:
+                #cb_axes = self.fig.add_axes([0.85, 0.15, 0.05, 0.7])
+                #fig.colorbar(sc, cax = cb_axes)
             
 
         plt.savefig('sleipner_perc.png')
