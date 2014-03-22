@@ -41,15 +41,18 @@ if __name__ == '__main__':
     # get parameters from command line
     arguments = sys.argv[1:]
     check_input_args(arguments)
-    nx = int(arguments[0])
-    ny = int(arguments[0])
-    nz = int(arguments[0])
+    #nx = int(arguments[0])
+    #ny = int(arguments[0])
+    #nz = int(arguments[0])
     #nz = 1
     r_max = 1000000
+    nx = 65
+    ny = 119
+    nz = 43
     perc = po.Perc(nx, ny, nz, r_max = r_max)
     mass_inflow = 0.1418
     density = 700.
-    sim_years = 1001
+    sim_years = int(arguments[0])
     # TODO Run 501 years!
     print "sim_years: " + str(sim_years)
     if sim_years == 11:
@@ -82,6 +85,8 @@ if __name__ == '__main__':
     print perc.inj.get_injected_mass() - \
             perc.inj.get_max_mass()
     perc.plot_sleipner_plume(years)
+    perc.plot_sleipner_cross_section(years, sec_index = 49)
+    #perc.contour_top_boundary()
     #perc.contour_topo()
     if nz == 1:
         perc.plot_2d()

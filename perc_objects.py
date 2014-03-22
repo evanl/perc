@@ -49,7 +49,7 @@ class Perc(object):
                 density)
 
     def add_volume(self, choice):
-        vol = self.poro[choice] * self.scmax * self.volume[choice]
+        vol = 0.1 *self.poro[choice] * self.scmax * self.volume[choice]
         return vol
 
     class Injection(object):
@@ -57,6 +57,7 @@ class Perc(object):
             self.rho = density
             self.massflow = megatons_year
                                     #conversion factor
+            self.mr_kg_sec = megatons_year * 31.71
             self.q = megatons_year * 31.71 / self.rho # -> m^3/s
             self.t_elapsed = 1998 * 365.25 # days
             self.t_end = end_time_days + self.t_elapsed
@@ -70,9 +71,11 @@ class Perc(object):
             return 0
         
         def add_mass(self, vol_add):
-            self.injected_mass += self.rho * vol_add
             self.injected_volume += vol_add
+            mass_add = self.rho * vol_add
+            self.injected_mass += mass_add
             time_taken = vol_add / (self.q * 24 * 3600) # add time in days
+            time_taken_1 = mass_add / (self.mr_kg_sec * 24 * 3600)
             self.add_time(time_taken)
             return 0
 
@@ -197,13 +200,8 @@ class Perc(object):
             else:
                 return False
         elif end_type == 'injection':
-            #if self.injection.end_reached():
-                #return True
-            #else:
-                #return False
             end_time = self.inj.get_end_time()
             elapsed = self.inj.get_elapsed_time()
-            #print '{:.3e}'.format(elapsed), '{:.3e}'.format(end_time)
             if elapsed > end_time:
                 print "end criterion"
                 print "time elapsed: " + str(elapsed)
@@ -274,6 +272,13 @@ class Perc(object):
         return 0
 
     def make_sleipner_grid(self, vol_dict, xyz_dict, poroperm_dict):
+        """ sets :
+            self.x
+            self.y
+            self.z
+            self.poro
+            self.perm
+        """
         t0 = clock()
         print "making Sleipner grid"
         self.nx = 65
@@ -428,12 +433,83 @@ class Perc(object):
             #elif i == 5:
                 #cb_axes = self.fig.add_axes([0.85, 0.15, 0.05, 0.7])
                 #fig.colorbar(sc, cax = cb_axes)
-            
-
         plt.savefig('sleipner_perc.png')
         plt.clf()
-
         return 0
+
+    def plot_sleipner_cross_section(self, years, sec_index = 32):
+        yr_indices = self.get_plan_year_indices(years)
+        size = 14
+        font = {'size' : size}
+        matplotlib.rc('font', **font)
+        fig = plt.figure(figsize=(16.0, 5))
+        pos = 150
+        top = []
+        bot = []
+        ybound = []
+        for key in self.x.keys():
+            if key[0] == sec_index:
+                t, b = self.get_boundary_zs(key[0], key[1])
+                top.append(t)
+                bot.append(b)
+                ybound.append(self.y[key])
+        for i in range(len(yr_indices)):
+            pos +=1
+            ax = fig.add_subplot(pos)
+            yf = []
+            zf = []
+            for n in range(yr_indices[i]):
+                key = self.fill_steps[n]
+                if key[0] == sec_index:
+                    yf.append(self.y[key])
+                    zf.append(self.z[key])
+            yp = np.asarray(yf)
+            zp = np.asarray(zf)
+            tp = np.asarray(top)
+            bp = np.asarray(bot)
+            yb = np.asarray(ybound)
+            tl = ax.scatter(yb, tp, s=5, c='r')
+            bl = ax.scatter(yb, bp, s=5, c='g')
+            sc = ax.scatter(yp, zp, s=10)
+            ax.set_title(str(years[i]))
+            ax.axis([0, 6000, -815, -800])
+            ax.xaxis.set_ticks(np.arange(0, 6000, 1500))
+            if i != 0:
+                ax.set_yticklabels([])
+        plt.savefig('sleipner_cross_section.png')
+        plt.clf()
+        return 0
+    
+    def contour_top_boundary(self):
+        top = []
+        x = []
+        y = []
+        top = []
+        for i in range(self.nx):
+            xinter = []
+            yinter = []
+            tinter = []
+            for j in range(self.ny):
+                key = (i, j, 2)
+                xinter.append(self.x[key])
+                yinter.append(self.y[key])
+                tinter.append(self.z[key])
+            x.append(xinter)
+            y.append(yinter)
+            top.append(tinter)
+        xp = np.asarray(x)
+        yp = np.asarray(y)
+        tp = np.asarray(top)
+        fig = plt.figure(figsize=(8.5,11))
+        ax = fig.add_subplot(111)
+        N = 50
+        cs_val = ax.contour(xp, yp, tp, N)
+        cb_val = plt.colorbar(cs_val, shrink = 0.8,\
+                extend='both')
+        cb_val.set_label('Top Boundary [z]')
+        fig.savefig('top_boundary.png', bbox_inches='tight', format='png')
+        return 0
+
 
     def make_scatter_plan_t0_tn(self, t0, tn):
         n = tn-t0
@@ -483,13 +559,41 @@ class Perc(object):
         cm = plt.get_cmap('bone_r')
         sc = ax.scatter(xfp, yfp, c = tf, vmin=tmin, vmax=tmax, s = 300, cmap=cm)
         plt.colorbar(sc)
-        plt.savefig('sleipner_3d.png')
+        plt.savefig('sleipner_2d.png')
         #plt.show()
+
+    def get_perc_contact(self, i, j, yr_index):
+        zk = []
+        zc = []
+        for n in range(yr_index):
+            key = self.fill_steps[n]
+            if i == key[0] and j == key[1]:
+                zk.append(key)
+                zc.append(self.z[key])
+        # TODO get maximum
+        mz = 1
+        contact = mz
+        return contact
+
+    def get_boundary_zs(self, i, j):
+        for k in range(1, self.nz):
+            key0 = (i, j, k-1)
+            key1 = (i, j, k)
+            if self.perm[key0] < 1. and self.perm[key1] > 1.:
+                ztop = self.z[key1]
+            elif self.perm[key0] > 1. and self.perm[key1] < 1.:
+                zbot = self.z[key0]
+        return ztop, zbot
+
+    def plot_cross_section(self):
+        return 0
+
+    def plot_contact_line(self):
+        return 0
 
     def plot_3d(self, uniform_grid = True):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection = '3d')
-
         if uniform_grid == True:
             pts = []
             xs = []
