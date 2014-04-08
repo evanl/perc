@@ -56,7 +56,7 @@ if __name__ == '__main__':
     # TODO Run 501 years!
     print "sim_years: " + str(sim_years)
     if sim_years == 11:
-        years = [2001, 2002, 2004, 2006, 2008]
+        years = [1999, 2001, 2002, 2004, 2006]
     elif sim_years == 51:
         years = [2000, 2010, 2020, 2030, 2040]
     elif sim_years == 151:
@@ -86,6 +86,8 @@ if __name__ == '__main__':
             perc.inj.get_max_mass()
     perc.plot_sleipner_plume(years)
     perc.plot_sleipner_cross_section(years, sec_index = 49)
+    perc.plot_sleipner_thick_contact(years, gwc = False)
+    perc.plot_sleipner_thick_contact(years, gwc = True)
     #perc.contour_top_boundary()
     #perc.contour_topo()
     if nz == 1:

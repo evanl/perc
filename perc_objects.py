@@ -49,7 +49,7 @@ class Perc(object):
                 density)
 
     def add_volume(self, choice):
-        vol = 0.1 *self.poro[choice] * self.scmax * self.volume[choice]
+        vol = 0.1 * self.poro[choice] * self.scmax * self.volume[choice]
         return vol
 
     class Injection(object):
@@ -308,7 +308,7 @@ class Perc(object):
                     self.perm[key] = perm
                     #if perm > 0.1:
                         #self.perm[key] = 2000.
-                    val = self.perc_threshold(key) + 1 * pow(10,5.)
+                    val = self.perc_threshold(key) + 1. * pow(10,5.)
                     #if i == 32 and j == 77:
                         #print '{:d}, {:.3e}, {:.3e}'.format(k, perm, val)
                     self.set_grid_value(key, val = val)
@@ -368,9 +368,9 @@ class Perc(object):
         pgrav = delta_rho * g * (self.thres_z[key])
         if key[0] == 32 and key[1] == 77:
             a = 1
-            #print "k, pcd, pgrav", "perm"
-            #print '{:d}, {:3e}, {:3e}, {:3e}'.format(key[2], pcd, \
-                    #pgrav, pcd + pgrav)
+            print "k, pcd, pgrav", "perm"
+            print '{:d}, {:3e}, {:3e}, {:3e}'.format(key[2], pcd, \
+                    pgrav, pcd + pgrav)
         return pcd + pgrav
 
     def get_time_index_gravseg(self):
@@ -398,6 +398,58 @@ class Perc(object):
                     yr_ind = n
                     yr_indices.append(yr_ind)
         return yr_indices
+
+    def plot_sleipner_thick_contact(self, years, gwc = False):
+        if gwc == True:
+            tc_str = 'contact'
+        else:
+            tc_str = 'thickness'
+        yr_indices = self.get_plan_year_indices(years)
+        size = 14
+        font = {'size' : size}
+        matplotlib.rc('font', **font)
+        fig = plt.figure(figsize=(16.0, 5))
+        pos = 150
+        for n in range(len(yr_indices)):
+            pos +=1
+            ax = fig.add_subplot(pos)
+            xf = []
+            yf = []
+            kf = []
+            for i in range(self.nx):
+                tempx = []
+                tempy = []
+                tempk = []
+                for j in range(self.ny):
+                    x = self.x[(i, j, 0)]
+                    y = self.y[(i, j, 0)]
+                    tn = yr_indices[n]
+                    thick, contact = self.get_thick_contact(i, j, tn)
+                    tempx.append(x)
+                    tempy.append(y)
+                    if gwc == True:
+                        tempk.append(contact)
+                    else:
+                        tempk.append(thick)
+                xf.append(tempx)
+                yf.append(tempy)
+                kf.append(tempk)
+            xp = np.asarray(xf)
+            yp = np.asarray(yf)
+            kp = np.asarray(kf)
+            N = 21
+            c = ax.contourf(xp, yp, kp, N)
+            cb = plt.colorbar(c, format='%.2f')
+            cb.set_ticks(np.linspace(np.amin(kp), np.amax(kp), N))
+            cb.set_label(tc_str + ': [m]')
+            ax.set_title(str(years[n]))
+            ax.axis([0, 3000, 0, 6000])
+            ax.xaxis.set_ticks(np.arange(0, 3000, 1500))
+            if n != 0:
+                ax.set_yticklabels([])
+        plt.savefig('sleipner_' + tc_str + '.png')
+        plt.clf()
+        return 0
 
     def plot_sleipner_plume(self, years):
         yr_indices = self.get_plan_year_indices(years)
@@ -562,19 +614,6 @@ class Perc(object):
         plt.savefig('sleipner_2d.png')
         #plt.show()
 
-    def get_perc_contact(self, i, j, yr_index):
-        zk = []
-        zc = []
-        for n in range(yr_index):
-            key = self.fill_steps[n]
-            if i == key[0] and j == key[1]:
-                zk.append(key)
-                zc.append(self.z[key])
-        # TODO get maximum
-        mz = 1
-        contact = mz
-        return contact
-
     def get_boundary_zs(self, i, j):
         for k in range(1, self.nz):
             key0 = (i, j, k-1)
@@ -585,11 +624,19 @@ class Perc(object):
                 zbot = self.z[key0]
         return ztop, zbot
 
-    def plot_cross_section(self):
-        return 0
-
-    def plot_contact_line(self):
-        return 0
+    def get_thick_contact(self, i, j, time_index):
+        column = []
+        for key in self.fill_steps[:time_index]:
+            if key[0] == i and key[1] == j:
+                column.append(self.z[key])
+        column.sort()
+        if len(column) == 0:
+            thick = 0.
+            contact = -850.
+        else:
+            thick = column[-1] - column[0] + 0.52
+            contact = column[0]
+        return thick, contact
 
     def plot_3d(self, uniform_grid = True):
         fig = plt.figure()
