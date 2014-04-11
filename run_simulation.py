@@ -49,7 +49,10 @@ if __name__ == '__main__':
     nx = 65
     ny = 119
     nz = 43
-    perc = po.Perc(nx, ny, nz, r_max = r_max)
+    vfrac = 0.1
+    # vfrac mass balance
+    # 100   44281
+    perc = po.Perc(nx, ny, nz, r_max = r_max, volume_fraction = vfrac)
     mass_inflow = 0.1418
     density = 700.
     sim_years = int(arguments[0])

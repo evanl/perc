@@ -11,7 +11,7 @@ from time import time, clock
 import csv
 
 class Perc(object):
-    def __init__(self, nx, ny, nz, r_max = 10):
+    def __init__(self, nx, ny, nz, r_max = 10, volume_fraction = 1.0):
         if nx >=3 and ny >=3:
             self.nx = nx
             self.ny = ny
@@ -42,6 +42,7 @@ class Perc(object):
         self.candidates = [] #keep sorted
         self.sbres = 0.2
         self.scmax = 1 - self.sbres
+        self.vfrac = volume_fraction
 
     def add_injection(self, megatons_year, end_time_days,\
             density):
@@ -49,7 +50,8 @@ class Perc(object):
                 density)
 
     def add_volume(self, choice):
-        vol = 0.1 * self.poro[choice] * self.scmax * self.volume[choice]
+        vol = self.vfrac * self.poro[choice] *\
+                self.scmax * self.volume[choice]
         return vol
 
     class Injection(object):
@@ -632,7 +634,7 @@ class Perc(object):
         column.sort()
         if len(column) == 0:
             thick = 0.
-            contact = -850.
+            contact = -830.
         else:
             thick = column[-1] - column[0] + 0.52
             contact = column[0]

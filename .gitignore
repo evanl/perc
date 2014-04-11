@@ -14,6 +14,10 @@
 *.snm
 *.toc
 *.bib
+100
+050
+030
+010
 M9X1*
 read_eclipse.py
 eclipse_cells.py
