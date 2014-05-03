@@ -49,17 +49,20 @@ if __name__ == '__main__':
     nx = 65
     ny = 119
     nz = 43
-    vfrac = 0.1
-    # vfrac mass balance
-    # 100   44281
-    perc = po.Perc(nx, ny, nz, r_max = r_max, volume_fraction = vfrac)
     mass_inflow = 0.1418
-    density = 700.
+
+    vfrac = 0.1
+    density = 308.
+    sim_title = 'p42_010'
+
     sim_years = int(arguments[0])
+    perc = po.Perc(nx, ny, nz, r_max = r_max, volume_fraction = vfrac)
     # TODO Run 501 years!
     print "sim_years: " + str(sim_years)
     if sim_years == 11:
         years = [1999, 2001, 2002, 2004, 2006]
+    elif sim_years == 13:
+        years = [1999, 2001, 2002, 2004, 2006, 2008]
     elif sim_years == 51:
         years = [2000, 2010, 2020, 2030, 2040]
     elif sim_years == 151:
@@ -87,10 +90,10 @@ if __name__ == '__main__':
     print "mass balance?"
     print perc.inj.get_injected_mass() - \
             perc.inj.get_max_mass()
-    perc.plot_sleipner_plume(years)
-    perc.plot_sleipner_cross_section(years, sec_index = 49)
-    perc.plot_sleipner_thick_contact(years, gwc = False)
-    perc.plot_sleipner_thick_contact(years, gwc = True)
+    perc.plot_sleipner_plume(years, sim_title = sim_title)
+    #perc.plot_sleipner_cross_section(years, sec_index = 49)
+    perc.plot_sleipner_thick_contact(years, gwc = False, sim_title = sim_title)
+    perc.plot_sleipner_thick_contact(years, gwc = True, sim_title = sim_title)
     #perc.contour_top_boundary()
     #perc.contour_topo()
     if nz == 1:

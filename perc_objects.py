@@ -344,7 +344,7 @@ class Perc(object):
         xp = np.asarray(x)
         yp = np.asarray(y)
         elp = np.asarray(elev)
-        N = 21
+        N = 10
         c = ax.contourf(xp, yp, elp, N)
         cb = plt.colorbar(c, format='%.2f')
         cb.set_ticks(np.linspace(np.amin(elp), np.amax(elp), N))
@@ -356,7 +356,6 @@ class Perc(object):
     def perc_threshold(self, key):
         # TODO
         # ioannidis et al 1996. 
-        # this is total bunk, by the way.
         c = 0.186
         c = pow(10.,8.)
         sigma = 0.045
@@ -401,7 +400,7 @@ class Perc(object):
                     yr_indices.append(yr_ind)
         return yr_indices
 
-    def plot_sleipner_thick_contact(self, years, gwc = False):
+    def plot_sleipner_thick_contact(self, years, gwc = False, sim_title = ''):
         if gwc == True:
             tc_str = 'contact'
         else:
@@ -410,8 +409,9 @@ class Perc(object):
         size = 14
         font = {'size' : size}
         matplotlib.rc('font', **font)
-        fig = plt.figure(figsize=(16.0, 5))
-        pos = 150
+        fig = plt.figure(figsize=(10.0, 2.5), dpi = 960)
+        middle = len(years) * 10
+        pos = 100 + middle
         for n in range(len(yr_indices)):
             pos +=1
             ax = fig.add_subplot(pos)
@@ -439,27 +439,33 @@ class Perc(object):
             xp = np.asarray(xf)
             yp = np.asarray(yf)
             kp = np.asarray(kf)
-            N = 21
+            N = 10
+            contour_label = False
+            ax_label = False
             c = ax.contourf(xp, yp, kp, N)
-            cb = plt.colorbar(c, format='%.2f')
-            cb.set_ticks(np.linspace(np.amin(kp), np.amax(kp), N))
-            cb.set_label(tc_str + ': [m]')
-            ax.set_title(str(years[n]))
-            ax.axis([0, 3000, 0, 6000])
-            ax.xaxis.set_ticks(np.arange(0, 3000, 1500))
+            if n == len(years) - 1:
+                fig.subplots_adjust(right=0.84)
+                cb_axes = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+                cb = fig.colorbar(c, cax = cb_axes, format = '%.2f')
+                cb.set_ticks(np.linspace(np.amin(kp), np.amax(kp), N))
+                cb.set_label(tc_str + ': [m]')
             if n != 0:
                 ax.set_yticklabels([])
-        plt.savefig('sleipner_' + tc_str + '.png')
+            ax.set_xticklabels([])
+            ax.set_title(str(years[n]))
+            ax.axis([0, 3000, 0, 6000])
+        plt.savefig(sim_title + '_' +  tc_str + '.pdf', fmt = 'pdf')
         plt.clf()
         return 0
 
-    def plot_sleipner_plume(self, years):
+    def plot_sleipner_plume(self, years, sim_title = 'sleipner_perc'):
         yr_indices = self.get_plan_year_indices(years)
         size = 14
         font = {'size' : size}
         matplotlib.rc('font', **font)
-        fig = plt.figure(figsize=(16.0, 5))
-        pos = 150
+        fig = plt.figure(figsize=(16.0, 5), dpi=960)
+        middle = len(years) * 10
+        pos = 100 + middle
         for i in range(len(yr_indices)):
             pos +=1
             ax = fig.add_subplot(pos)
@@ -475,7 +481,6 @@ class Perc(object):
                 kf.append(key[2])
                 if 50 == key[1]:
                     key1 = (key[0], key[1]-1, key[2])
-                    #print key, self.y[key], self.z[key], self.z[key1]
             xp = np.asarray(xf)
             yp = np.asarray(yf)
             sc = ax.scatter(xp, yp, s=20, c=kf)
@@ -487,7 +492,7 @@ class Perc(object):
             #elif i == 5:
                 #cb_axes = self.fig.add_axes([0.85, 0.15, 0.05, 0.7])
                 #fig.colorbar(sc, cax = cb_axes)
-        plt.savefig('sleipner_perc.png')
+        plt.savefig(sim_title + '_plume.pdf', fmt = 'pdf')
         plt.clf()
         return 0
 
@@ -634,10 +639,12 @@ class Perc(object):
         column.sort()
         if len(column) == 0:
             thick = 0.
-            contact = -830.
+            contact = -812.
         else:
             thick = column[-1] - column[0] + 0.52
             contact = column[0]
+            if contact < -812.:
+                contact = -812.
         return thick, contact
 
     def plot_3d(self, uniform_grid = True):
