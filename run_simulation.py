@@ -50,10 +50,12 @@ if __name__ == '__main__':
     ny = 119
     nz = 43
     mass_inflow = 0.1418
+    mass_inflow = [0.0198, 0.0405, 0.0437, 0.0540, 0.0740, 0.1030, \
+                  0.1390, 0.1830, 0.2370, 0.2960, 0.370, 0.421, 0.505]
 
-    vfrac = 0.1
+    vfrac = 0.3
     density = 308.
-    sim_title = 'p42_010'
+    sim_title = 'pvar_42_030'
 
     sim_years = int(arguments[0])
     perc = po.Perc(nx, ny, nz, r_max = r_max, volume_fraction = vfrac)

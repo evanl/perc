@@ -44,9 +44,9 @@ class Perc(object):
         self.scmax = 1 - self.sbres
         self.vfrac = volume_fraction
 
-    def add_injection(self, megatons_year, end_time_days,\
+    def add_injection(self, mass_inflow, end_time_days, \
             density):
-        self.inj = self.Injection(megatons_year, end_time_days, \
+        self.inj = self.Injection(mass_inflow, end_time_days, \
                 density)
 
     def add_volume(self, choice):
@@ -55,17 +55,30 @@ class Perc(object):
         return vol
 
     class Injection(object):
-        def __init__(self, megatons_year, end_time_days, density):
-            self.rho = density
-            self.massflow = megatons_year
-                                    #conversion factor
-            self.mr_kg_sec = megatons_year * 31.71
-            self.q = megatons_year * 31.71 / self.rho # -> m^3/s
+        def __init__(self, mass_inflow, end_time_days, density):
             self.t_elapsed = 1998 * 365.25 # days
+            self.q_index = 0
             self.t_end = end_time_days + self.t_elapsed
+            self.rho = density
+            self.massflow = mass_inflow
+                                    #conversion factor
+            self.mr_kg_sec = []
+            self.q = []
+            self.end_days = []
+            for i in range(len(self.massflow)):
+                self.mr_kg_sec.append(self.massflow[i] * 31.71)
+                self.q.append(self.massflow[i] * 31.71 / self.rho) # -> m^3/s
+                self.end_days.append((1999 + i) * 365.25)
+
             self.injected_mass = 0.
             self.injected_volume = 0.
-            self.max_mass = end_time_days * self.massflow * 31.71 * 24 * 3600.
+
+            msum = 0.
+            for i in range(len(self.massflow)):
+                msum += self.massflow[i]
+            massflow_avg = msum / float(len(self.massflow))
+                
+            self.max_mass = end_time_days * massflow_avg* 31.71 * 24 * 3600.
             self.max_volume = self.max_mass / self.rho
 
         def add_time(self, t_add):
@@ -76,9 +89,17 @@ class Perc(object):
             self.injected_volume += vol_add
             mass_add = self.rho * vol_add
             self.injected_mass += mass_add
-            time_taken = vol_add / (self.q * 24 * 3600) # add time in days
-            time_taken_1 = mass_add / (self.mr_kg_sec * 24 * 3600)
+            time_taken = vol_add / (self.q[self.q_index] * 24 * 3600) 
+            # add time in days ^^^
+            time_taken_1 = mass_add / (self.mr_kg_sec[self.q_index] * 24 * 3600)
             self.add_time(time_taken)
+            if self.get_elapsed_time() > self.end_days[self.q_index] and \
+                    self.q_index <= len(self.end_days) -1:
+                self.increment_q_index()
+            return 0
+
+        def increment_q_index(self):
+            self.q_index += 1
             return 0
 
         def get_elapsed_time(self):
