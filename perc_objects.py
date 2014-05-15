@@ -464,9 +464,11 @@ class Perc(object):
             contour_label = False
             ax_label = False
             c = ax.contourf(xp, yp, kp, N)
+            plt.tick_params(which='major', length=3, color = 'w')
             if n == len(years) - 1:
                 fig.subplots_adjust(right=0.84)
                 cb_axes = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+                plt.tick_params(which='major', length=3, color = 'k')
                 cb = fig.colorbar(c, cax = cb_axes, format = '%.2f')
                 cb.set_ticks(np.linspace(np.amin(kp), np.amax(kp), N))
                 cb.set_label(tc_str + ': [m]')
@@ -475,6 +477,7 @@ class Perc(object):
             ax.set_xticklabels([])
             ax.set_title(str(years[n]))
             ax.axis([0, 3000, 0, 6000])
+            ax.xaxis.set_ticks(np.arange(0,3500,1000))
         plt.savefig(sim_title + '_' +  tc_str + '.pdf', fmt = 'pdf')
         plt.clf()
         return 0

@@ -53,9 +53,9 @@ if __name__ == '__main__':
     mass_inflow = [0.0198, 0.0405, 0.0437, 0.0540, 0.0740, 0.1030, \
                   0.1390, 0.1830, 0.2370, 0.2960, 0.370, 0.421, 0.505]
 
-    vfrac = 0.3
-    density = 308.
-    sim_title = 'pvar_42_030'
+    vfrac = 0.5
+    density = 465.
+    sim_title = 'pvar_37_050'
 
     sim_years = int(arguments[0])
     perc = po.Perc(nx, ny, nz, r_max = r_max, volume_fraction = vfrac)
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     print "percolation time = ", t1 - t0
     n, tseg = perc.get_time_index_gravseg()
     print "n, gravseg_days"
-    print n, tseg
+    print n, (tesg - 1998. * 365.25)
     yr_indices = perc.get_plan_year_indices(years)
     print yr_indices
     print "mass balance?"
